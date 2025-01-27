@@ -19,19 +19,32 @@ namespace SimpleMessaging
         
         public Task Run(CancellationToken ct)
         {
-            /*
-             * TODO:
-             * Create a Task that will
-             *     check for cancellation
-             *     create a data type channel consumer
-             *     while true
-             *         try go get a message
-             *         dispatch that message to a handler
-             *         yield for 1 second
-             *         check for cancellation
-             *     dispose of the channel
-             *  return the task
-             */
+            return Task.Run(async () =>
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                using var consumer = new DataTypeChannelConsumer<T>(_messageSerializer, _hostName);
+                while (true)
+                {
+                    var message = consumer.Receive();
+                    if (message != null)
+                    {
+                        _messageHandler.Handle(message);
+                    }
+                    else
+                    {
+                        Console.WriteLine("No message received");
+                    }
+                    await Task.Delay(1000, ct);
+                    if (ct.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                }
+            }, ct);
         }
     }
 }
