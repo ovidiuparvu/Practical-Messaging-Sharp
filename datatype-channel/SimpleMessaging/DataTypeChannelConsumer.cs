@@ -56,10 +56,7 @@ namespace SimpleMessaging
         public T Receive()
         {
             var result = _channel.BasicGet(_queueName, autoAck: true);
-            if (result != null)
-                //TODO: deserialize the message
-            else
-                return default(T) ;
+            return result != null ? _messageDeserializer(Encoding.UTF8.GetString(result.Body.ToArray())) : default(T);
         }   
 
         public void Dispose()
