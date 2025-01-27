@@ -49,13 +49,12 @@ namespace SimpleMessaging
             var invalidMessageQueueName = invalidRoutingKey;
             
             _channel.ExchangeDeclare(ExchangeName, ExchangeType.Direct, durable: false);
-            _channel.QueueDeclare(queueName, exclusive: false, autoDelete: false, durable: false);
-            var queueBindingArgs = new Dictionary<string, object>()
+            _channel.QueueDeclare(queueName, exclusive: false, autoDelete: false, durable: false, arguments: new Dictionary<string, object>
             {
                 {"x-dead-letter-exchange", InvalidMessageExchangeName},
                 {"x-dead-letter-routing-key", invalidRoutingKey},
-            };
-            _channel.QueueBind(queue: queueName, exchange: ExchangeName, routingKey: _routingKey, arguments: queueBindingArgs);
+            });
+            _channel.QueueBind(queue: queueName, exchange: ExchangeName, routingKey: _routingKey);
             
             //declare a queue for invalid messages off an invalid message exchange
             //messages that we nack without requeue will go here
