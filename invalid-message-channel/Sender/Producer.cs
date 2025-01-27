@@ -9,10 +9,12 @@ namespace Sender
     {
         static void Main(string[] args)
         {
-            using (var channel = new BadDataTypeChannelProducer<BadGreeting, Greeting>((bad_greeting) => JsonConvert.SerializeObject(bad_greeting)))
+            using (var channel = new BadDataTypeChannelProducer<BadGreeting, Greeting>(JsonConvert.SerializeObject))
             {
-                var greeting = new BadGreeting();
-                greeting.GreetingNumber = 3;
+                var greeting = new BadGreeting
+                {
+                    GreetingNumber = 3
+                };
                 channel.Send(greeting);
                 Console.WriteLine("Sent message {0}", greeting.GreetingNumber);
             }
