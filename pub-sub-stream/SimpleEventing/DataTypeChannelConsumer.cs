@@ -15,26 +15,20 @@ public class DataTypeChannelConsumer<T> : IDisposable where T: IAmAMessage
         var consumerConfig = new ConsumerConfig
         {
             BootstrapServers = "localhost:9092",
-            GroupId = "SimpleEventing",
+            GroupId = "SimpleEventing2",
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = true,
             EnableAutoOffsetStore = false
         };
-        
-        //TODO: Create a ConsumerConfig file to configure Kafka. You will need to set:
-        // BootstrapServers
-        // GroupId
-        // AutoOffsetReset (earliest)
-        // EnableAutoCommit (true)
-        // EnableAutoOffsetStore (false)
-        
-        //TODO: Build a Consumer using the ConsumerConfig above
-        // SetErrorHandler to write to the console
-        // SetLogHandler to write to the console
-        // SetPartitionsRevokedHandler to store the offset for each partition
-        
-        //TODO: Subscribe to the topic "Pub-Sub-Stream-" + typeof(T).FullName
-        
+
+        _consumer = new ConsumerBuilder<string, string>(consumerConfig)
+            .SetErrorHandler((c, e) => Console.WriteLine(e.Reason))
+            .SetLogHandler((c, m) => Console.WriteLine(m.Message))
+            .SetPartitionsRevokedHandler((c, partitions) => partitions.ForEach(c.StoreOffset))
+            .Build();
+
+        var topic = "Pub-Sub-Stream-" + typeof(T).FullName;
+        _consumer.Subscribe(topic);
     }
     
     public async Task Receive(CancellationToken cancellationToken)
@@ -43,13 +37,34 @@ public class DataTypeChannelConsumer<T> : IDisposable where T: IAmAMessage
         {
             while (true)
             {
-                // TODO: Consume a message from Kafka
-                // Translate the message using the _translator function
-                // Handle the message using the _handler function
-                // Store the offset for the partition in the background thread
-                //We don't want to commit unless we have successfully handled the message
-                //_consumer.Commit(consumeResult); would commit manually, but with EnableAutoOffsetStore disabled,
-                //we can instead just manually store "done" offsets for a background thread to commit
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                var consumeResult = _consumer.Consume();
+                if (consumeResult != null)
+                {
+                    if (consumeResult.IsPartitionEOF)
+                    {
+                        Console.WriteLine($"Reached end of topic {consumeResult.Topic}, partition {consumeResult.Partition}, offset {consumeResult.Offset}.");
+                        continue;
+                    }
+
+                    var translatedMessage = _translator(consumeResult.Message);
+                    if (_handler(translatedMessage))
+                    {
+                        _consumer.StoreOffset(consumeResult);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Failed to handle message");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("No message received");
+                }
             }
         }
         catch(ConsumeException e)
