@@ -36,26 +36,30 @@ namespace SimpleMessaging
         /// <returns></returns>
         public Task Run(CancellationToken ct)
         {
-            var task = Task.Factory.StartNew(() =>
+            var task = Task.Factory.StartNew(async () =>
                 {
                     ct.ThrowIfCancellationRequested();
-                    
-                    /*TODO
-                     *
-                     * Create an in pipe from a DataTypeChannelConsumer
-                     * while true
-                     *     read from the inpipe
-                     *     if we get a message
-                     *         use the operation to transform the message
-                     *         create a DataTypeChannelProducer for the out pipe
-                     *             Send the message on the outpipe
-                     *         dispose of the producer
-                     *     else
-                     *         delay by 1ms
-                     *     check for a cancelled token
-                     * displose of the consumer
-                     */
-               }, ct
+                    using var consumer = new DataTypeChannelConsumer<TIn>(_messageDeserializer, _hostName);
+                    while (true)
+                    {
+                        var message = consumer.Receive();
+                        if (message == null)
+                        {
+                            Console.WriteLine("No message received");
+                            await Task.Delay(1, ct);
+                        }
+                        else
+                        {
+                            var enrichedMessage = _operation.Execute(message);   
+                            using var producer = new DataTypeChannelProducer<TOut>(_messageSerializer, _hostName);
+                            producer.Send(enrichedMessage);
+                        }
+                        if (ct.IsCancellationRequested)
+                        {
+                            return;
+                        }
+                    }
+                }, ct
             );
             return task;
         }
